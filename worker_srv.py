@@ -20,6 +20,8 @@ from subprocess import call
 import json
 import pandas as pd
 import numpy as np
+import pwd
+import grp
 
 # Set up zeromq sockets
 import zmq
@@ -39,7 +41,7 @@ user_data_path = beamline_gpfs_path + 'User Data/'
 
 
 class ScanProcessor():
-    def __init__(self, gen_parser, xia_parser, db, beamline_gpfs_path, zmq_sender, *args, **kwargs):
+    def __init__(self, gen_parser, xia_parser, db, beamline_gpfs_path, zmq_sender, username, *args, **kwargs):
         self.gen_parser = gen_parser
         self.xia_parser = xia_parser
         self.db = db
@@ -47,6 +49,8 @@ class ScanProcessor():
         self.user_data_path = Path(beamline_gpfs_path) / Path('User Data')
         self.xia_data_path = Path(beamline_gpfs_path) / Path('xia_files')
         self.sender = zmq_sender
+        self.uid = pwd.getpwnam(username).pw_uid
+        self.gid = grp.getgrnam(username).gr_gid
 
     def process(self, md, requester, interp_base='i0'):
         print('starting processing!')
@@ -71,8 +75,11 @@ class ScanProcessor():
                 division = self.gen_parser.interp_df['i0'].values / self.gen_parser.interp_df['it'].values
                 division[division < 0] = 1
 
-                self.gen_parser.export_trace_hdf5(current_filepath[:-5], '')
-                self.gen_parser.export_trace(current_filepath[:-5], '')
+                filename = self.gen_parser.export_trace_hdf5(current_filepath[:-5], '')
+                os.chown(filename, self.uid, self.gid)
+
+                filename = self.gen_parser.export_trace(current_filepath[:-5], '')
+                os.chown(filename, self.uid, self.gid)
 
                 ret = create_ret('spectroscopy', current_uid, 'interpolate', self.gen_parser.interp_df.to_json(),
                                  md, requester)
@@ -81,7 +88,10 @@ class ScanProcessor():
 
                 e0 = int(md['e0'])
                 bin_df = self.gen_parser.bin(e0, e0 - 30, e0 + 50, 10, 0.2, 0.04)
-                self.gen_parser.data_manager.export_dat(current_filepath[:-5]+'.hdf5')
+
+                filename = self.gen_parser.data_manager.export_dat(current_filepath[:-5]+'.hdf5')
+                os.chown(filename, self.uid, self.gid)
+
                 ret = create_ret('spectroscopy', current_uid, 'bin', bin_df.to_json(), md, requester)
                 self.sender.send(ret)
                 print('Done with the binning!')
@@ -95,15 +105,37 @@ class ScanProcessor():
             elif md['plan_name'] == 'relative_scan':
                 pass
 
-    def bin(self, md, e0, edge_start, edge_end):
+    def bin(self, md, requester, proc_info):
         print('starting binning!')
         current_path = self.create_user_dirs(self.user_data_path,
                                              md['year'],
                                              md['cycle'],
                                              md['PROPOSAL'])
         current_filepath = Path(current_path) / Path(md['name'])
-        self.gen_parser.loadInterpFile(current_filepath)
-         
+        self.gen_parser.loadInterpFile(str(current_filepath) + '.txt')
+        e0 = proc_info['e0']
+        edge_start = proc_info['edge_start']
+        edge_end = proc_info['edge_end']
+        preedge_spacing = proc_info['preedge_spacing']
+        xanes_spacing = proc_info['xanes_spacing']
+        exafs_spacing = proc_info['exafs_spacing']
+        bin_df = self.gen_parser.bin(e0, e0 + edge_start, e0 + edge_end, preedge_spacing, xanes_spacing, exafs_spacing)
+
+        filename = self.gen_parser.data_manager.export_dat(f'{str(current_filepath)}.txt')
+        os.chown(filename, self.uid, self.gid)
+        ret = create_ret('spectroscopy', md['uid'], 'bin', bin_df.to_json(), md, requester)
+        self.sender.send(ret)
+        print(os.getpid(), 'Done with the binning!') 
+
+    def return_interp_data(self, md, requester):
+        current_path = self.create_user_dirs(self.user_data_path,
+                                             md['year'],
+                                             md['cycle'],
+                                             md['PROPOSAL'])
+        current_filepath = Path(current_path) / Path(md['name'])
+        self.gen_parser.loadInterpFile(f'{str(current_filepath)}.txt')
+        ret = create_ret('spectroscopy', md['uid'], 'request_interpolated_data', self.gen_parser.interp_df.to_json(), md, requester)
+        self.sender.send(ret)
 
     def process_tscan(self, interp_base='i0'):
         print('Processing tscan')
@@ -231,7 +263,7 @@ def create_ret(scan_type, uid, process_type, data, metadata, requester):
 
 
 if __name__ == "__main__":
-    processor = ScanProcessor(gen_parser, xia_parser, db, beamline_gpfs_path, sender)
+    processor = ScanProcessor(gen_parser, xia_parser, db, beamline_gpfs_path, sender, 'xf08id')
     
     while True:
         data = json.loads(receiver.recv().decode('utf-8'))
@@ -245,7 +277,10 @@ if __name__ == "__main__":
                 processor.process(start_doc, requester=data['requester'], interp_base=data['processing_info']['interp_base'])
                
             elif process_type == 'bin':
-                processor.bin(start_doc) #, binning info)
+                processor.bin(start_doc, requester=data['requester'], proc_info=data['processing_info'])
+
+            elif process_type == 'request_interpolated_data':
+                processor.return_interp_data(start_doc, requester=data['requester'])
 
 #                interpolated_fn = '{}{}.{}.{}/{}.txt'.format(user_data_path,
 #                                                        md['year'],
