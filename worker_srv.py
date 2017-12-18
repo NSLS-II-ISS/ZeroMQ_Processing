@@ -18,6 +18,7 @@ import os
 import os.path as op
 from subprocess import call
 import json
+import pickle
 import pandas as pd
 import numpy as np
 import pwd
@@ -81,7 +82,7 @@ class ScanProcessor():
                 filename = self.gen_parser.export_trace(current_filepath[:-5], '')
                 os.chown(filename, self.uid, self.gid)
 
-                ret = create_ret('spectroscopy', current_uid, 'interpolate', self.gen_parser.interp_df.to_json(),
+                ret = create_ret('spectroscopy', current_uid, 'interpolate', self.gen_parser.interp_df,
                                  md, requester)
                 self.sender.send(ret)
                 print('Done with the interpolation!')
@@ -92,7 +93,7 @@ class ScanProcessor():
                 filename = self.gen_parser.data_manager.export_dat(current_filepath[:-5]+'.hdf5')
                 os.chown(filename, self.uid, self.gid)
 
-                ret = create_ret('spectroscopy', current_uid, 'bin', bin_df.to_json(), md, requester)
+                ret = create_ret('spectroscopy', current_uid, 'bin', bin_df, md, requester)
                 self.sender.send(ret)
                 print('Done with the binning!')
 
@@ -123,7 +124,7 @@ class ScanProcessor():
 
         filename = self.gen_parser.data_manager.export_dat(f'{str(current_filepath)}.txt')
         os.chown(filename, self.uid, self.gid)
-        ret = create_ret('spectroscopy', md['uid'], 'bin', bin_df.to_json(), md, requester)
+        ret = create_ret('spectroscopy', md['uid'], 'bin', bin_df, md, requester)
         self.sender.send(ret)
         print(os.getpid(), 'Done with the binning!') 
 
@@ -134,7 +135,7 @@ class ScanProcessor():
                                              md['PROPOSAL'])
         current_filepath = Path(current_path) / Path(md['name'])
         self.gen_parser.loadInterpFile(f'{str(current_filepath)}.txt')
-        ret = create_ret('spectroscopy', md['uid'], 'request_interpolated_data', self.gen_parser.interp_df.to_json(), md, requester)
+        ret = create_ret('spectroscopy', md['uid'], 'request_interpolated_data', self.gen_parser.interp_df, md, requester)
         self.sender.send(ret)
 
     def process_tscan(self, interp_base='i0'):
@@ -254,12 +255,12 @@ def create_ret(scan_type, uid, process_type, data, metadata, requester):
            'uid': uid,
            'processing_ret':{
                              'type':process_type,
-                             'data':data,
+                             'data':data.to_msgpack(compress='zlib'),
                              'metadata': metadata
                             }
           }
 
-    return (requester + json.dumps(ret)).encode()
+    return (requester.encode() + pickle.dumps(ret))
 
 
 if __name__ == "__main__":
