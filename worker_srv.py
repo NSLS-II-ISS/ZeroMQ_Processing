@@ -30,7 +30,7 @@ context = zmq.Context()
 
 # Create PULLER to receive information from workstations
 receiver = context.socket(zmq.PULL)
-receiver.connect("tcp://localhost:5560")
+receiver.connect("tcp://xf08id-srv1:5560")
 
 # Create PUSHER to send information back to workstations
 sender = context.socket(zmq.PUSH)
