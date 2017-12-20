@@ -90,7 +90,7 @@ class ScanProcessor():
                 e0 = int(md['e0'])
                 bin_df = self.gen_parser.bin(e0, e0 - 30, e0 + 50, 10, 0.2, 0.04)
 
-                filename = self.gen_parser.data_manager.export_dat(current_filepath[:-5]+'.hdf5')
+                filename = self.gen_parser.data_manager.export_dat(current_filepath[:-5]+'.hdf5', e0)
                 os.chown(filename, self.uid, self.gid)
 
                 ret = create_ret('spectroscopy', current_uid, 'bin', bin_df, md, requester)
@@ -122,7 +122,7 @@ class ScanProcessor():
         exafs_spacing = proc_info['exafs_spacing']
         bin_df = self.gen_parser.bin(e0, e0 + edge_start, e0 + edge_end, preedge_spacing, xanes_spacing, exafs_spacing)
 
-        filename = self.gen_parser.data_manager.export_dat(f'{str(current_filepath)}.txt')
+        filename = self.gen_parser.data_manager.export_dat(f'{str(current_filepath)}.txt', e0)
         os.chown(filename, self.uid, self.gid)
         ret = create_ret('spectroscopy', md['uid'], 'bin', bin_df, md, requester)
         self.sender.send(ret)
