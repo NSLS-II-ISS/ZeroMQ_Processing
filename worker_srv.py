@@ -106,14 +106,17 @@ class ScanProcessor():
             elif md['plan_name'] == 'relative_scan':
                 pass
 
-    def bin(self, md, requester, proc_info):
-        print('starting binning!')
-        current_path = self.create_user_dirs(self.user_data_path,
-                                             md['year'],
-                                             md['cycle'],
-                                             md['PROPOSAL'])
-        current_filepath = Path(current_path) / Path(md['name'])
-        self.gen_parser.loadInterpFile(str(current_filepath) + '.txt')
+    def bin(self, md, requester, proc_info, filepath=''):
+        print('starting binning!', md['uid'])
+        if filepath is not '':
+            current_filepath = filepath
+        else:
+            current_path = self.create_user_dirs(self.user_data_path,
+                                                 md['year'],
+                                                 md['cycle'],
+                                                 md['PROPOSAL'])
+            current_filepath = str(Path(current_path) / Path(md['name'])) + '.txt'
+        self.gen_parser.loadInterpFile(str(current_filepath))
         e0 = proc_info['e0']
         edge_start = proc_info['edge_start']
         edge_end = proc_info['edge_end']
@@ -122,19 +125,22 @@ class ScanProcessor():
         exafs_spacing = proc_info['exafs_spacing']
         bin_df = self.gen_parser.bin(e0, e0 + edge_start, e0 + edge_end, preedge_spacing, xanes_spacing, exafs_spacing)
 
-        filename = self.gen_parser.data_manager.export_dat(f'{str(current_filepath)}.txt', e0)
+        filename = self.gen_parser.data_manager.export_dat(f'{str(current_filepath)}', e0)
         os.chown(filename, self.uid, self.gid)
         ret = create_ret('spectroscopy', md['uid'], 'bin', bin_df, md, requester)
         self.sender.send(ret)
         print(os.getpid(), 'Done with the binning!') 
 
-    def return_interp_data(self, md, requester):
-        current_path = self.create_user_dirs(self.user_data_path,
-                                             md['year'],
-                                             md['cycle'],
-                                             md['PROPOSAL'])
-        current_filepath = Path(current_path) / Path(md['name'])
-        self.gen_parser.loadInterpFile(f'{str(current_filepath)}.txt')
+    def return_interp_data(self, md, requester, filepath=''):
+        if filepath is not '':
+            current_filepath = filepath
+        else:
+            current_path = self.create_user_dirs(self.user_data_path,
+                                                 md['year'],
+                                                 md['cycle'],
+                                                 md['PROPOSAL'])
+            current_filepath = str(Path(current_path) / Path(md['name'])) + '.txt'
+        self.gen_parser.loadInterpFile(f'{str(current_filepath)}')
         ret = create_ret('spectroscopy', md['uid'], 'request_interpolated_data', self.gen_parser.interp_df, md, requester)
         self.sender.send(ret)
 
@@ -278,10 +284,10 @@ if __name__ == "__main__":
                 processor.process(start_doc, requester=data['requester'], interp_base=data['processing_info']['interp_base'])
                
             elif process_type == 'bin':
-                processor.bin(start_doc, requester=data['requester'], proc_info=data['processing_info'])
+                processor.bin(start_doc, requester=data['requester'], proc_info=data['processing_info'], filepath=data['processing_info']['filepath'])
 
             elif process_type == 'request_interpolated_data':
-                processor.return_interp_data(start_doc, requester=data['requester'])
+                processor.return_interp_data(start_doc, requester=data['requester'], filepath=data['processing_info']['filepath'])
 
 #                interpolated_fn = '{}{}.{}.{}/{}.txt'.format(user_data_path,
 #                                                        md['year'],
