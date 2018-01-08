@@ -6,7 +6,7 @@ context = zmq.Context()
 receiver = context.socket(zmq.PULL)
 receiver.bind("tcp://*:5559")
 
-# Create PUSHER to send information to workers (instances on xf08id-srv1)
+# Create PUSHER to send information to workers (instances on xf08id-srv2)
 sender = context.socket(zmq.PUSH)
 sender.bind("tcp://*:5560")
 

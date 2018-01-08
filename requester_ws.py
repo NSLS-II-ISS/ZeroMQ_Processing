@@ -10,11 +10,11 @@ plt.ion()
 
 context = zmq.Context()
 sender = context.socket(zmq.PUSH)
-sender.connect("tcp://xf08id-srv1:5559")
+sender.connect("tcp://xf08id-srv2:5559")
 
 # Create SUBSCRIBER to get information from 'gateway'
 subscriber = context.socket(zmq.SUB)
-subscriber.connect("tcp://xf08id-srv1:5562")
+subscriber.connect("tcp://xf08id-srv2:5562")
 
 hostname_filter = socket.gethostname()
 
