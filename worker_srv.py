@@ -47,6 +47,7 @@ class ScanProcessor():
         self.xia_parser = xia_parser
         self.db = db
         self.md = {}
+        self.root_path = Path(beamline_gpfs_path)
         self.user_data_path = Path(beamline_gpfs_path) / Path('User Data')
         self.xia_data_path = Path(beamline_gpfs_path) / Path('xia_files')
         self.sender = zmq_sender
@@ -64,13 +65,14 @@ class ScanProcessor():
         current_uid = md['uid']
         self.gen_parser.load(current_uid)
 
+        print('on the way')
         if 'plan_name' in md:
             if md['plan_name'] == 'get_offsets':
                 pass
-            elif md['plan_name'] == 'execute_trajectory':
-                if 'xia_filename' not in md:
+            elif md['plan_name'] == 'execute_trajectory' or md['plan_name'] == 'execute_xia_trajectory':
+                if md['plan_name'] == 'execute_trajectory':
                     self.process_tscan(interp_base)
-                else:
+                elif md['plan_name'] == 'execute_xia_trajectory':
                     self.process_tscanxia(md, current_filepath)
 
                 division = self.gen_parser.interp_df['i0'].values / self.gen_parser.interp_df['it'].values
@@ -91,18 +93,20 @@ class ScanProcessor():
                 bin_df = self.gen_parser.bin(e0, e0 - 30, e0 + 50, 10, 0.2, 0.04)
 
                 filename = self.gen_parser.data_manager.export_dat(current_filepath[:-5]+'.hdf5', e0)
+                print(f"current_filepath: {current_filepath[:-5] + '.hdf5'}")
                 os.chown(filename, self.uid, self.gid)
 
                 ret = create_ret('spectroscopy', current_uid, 'bin', bin_df, md, requester)
                 self.sender.send(ret)
                 print('Done with the binning!')
 
+                
                 #store_results_databroker(md,
                 #                         parent_uid,
                 #                         db_analysis,
                 #                         'interpolated',
-                #                         Path(filepath) / Path('2017.3.301954/SPS_Brow_Xcut_R12 28.hdf5'),
-                #                         root=rootpath)
+                #                         current_filepath[:-5] + '.hdf5',
+                #                         root='')
             elif md['plan_name'] == 'relative_scan':
                 pass
 
@@ -150,10 +154,13 @@ class ScanProcessor():
 
     def process_tscanxia(self, md, current_filepath):
         # Parse xia
+        print('Processing: xia scan')
+        self.gen_parser.interpolate(key_base='xia_trigger')
         xia_filename = md['xia_filename']
         xia_filepath = 'smb://xf08id-nas1/xia_data/{}'.format(xia_filename)
-        xia_destfilepath = '{}{}'.format(self.xia_data_path, xia_filename)
-        smbclient = xiaparser.smbclient(xia_filepath, xia_destfilepath)
+        xia_destfilepath = Path(self.xia_data_path) / Path(xia_filename)
+#        xia_destfilepath = '{}{}'.format(self.xia_data_path, xia_filename)
+        smbclient = xiaparser.smbclient(xia_filepath, str(xia_destfilepath))
         try:
             smbclient.copy()
         except Exception as exc:
@@ -193,7 +200,7 @@ class ScanProcessor():
                 xia_max_energy = 20
 
             for mca_number in range(1, xia_parser.channelsCount() + 1):
-                if '{}_mca{}_roi0_high'.format(xia1.name, mca_number) in xia_rois:
+                if 'xia1_mca{}_roi0_high'.format(mca_number) in xia_rois:
                     rois_array = []
                     roi_numbers = [roi_number for roi_number in
                                    [roi.split('mca{}_roi'.format(mca_number))[1].split('_high')[0] for roi in
@@ -201,8 +208,8 @@ class ScanProcessor():
                                    len(roi_number) <= 3]
                     for roi_number in roi_numbers:
                         rois_array.append(
-                            [xia_rois['{}_mca{}_roi{}_high'.format(xia1.name, mca_number, roi_number)],
-                             xia_rois['{}_mca{}_roi{}_low'.format(xia1.name, mca_number, roi_number)]])
+                            [xia_rois['xia1_mca{}_roi{}_high'.format(mca_number, roi_number)],
+                             xia_rois['xia1_mca{}_roi{}_low'.format(mca_number, roi_number)]])
                     mcas.append(xia_parser.parse_roi(range(0, length), mca_number, rois_array, xia_max_energy))
                 else:
                     mcas.append(xia_parser.parse_roi(range(0, length), mca_number, [
@@ -217,8 +224,11 @@ class ScanProcessor():
                 if not len(roi_label):
                     roi_label = 'XIA_ROI{}'.format(roi_numbers[index_roi])
 
-                self.gen_parser.interp_arrays[roi_label] = np.array(
-                    [self.gen_parser.interp_arrays['energy'][:, 0], xia_sum]).transpose()
+                self.gen_parser.interp_df[roi_label] = np.array([xia_sum]).transpose()
+
+                #self.gen_parser.interp_arrays[roi_label] = np.array(
+                #    [self.gen_parser.interp_arrays['energy'][:, 0], xia_sum]).transpose()
+
                 #self.figure.ax.plot(self.gen_parser.interp_arrays['energy'][:, 1], -(
                 #    self.gen_parser.interp_arrays[roi_label][:, 1] / self.gen_parser.interp_arrays['i0'][:, 1]))
 
