@@ -60,10 +60,15 @@ class ScanProcessor():
                                              md['year'],
                                              md['cycle'],
                                              md['PROPOSAL'])
-        current_filepath = Path(current_path) / Path(md['name'])
-        current_filepath = ScanProcessor.get_new_filepath(str(current_filepath) + '.hdf5')
-        current_uid = md['uid']
-        self.gen_parser.load(current_uid)
+        try:
+            current_filepath = Path(current_path) / Path(md['name'])
+            current_filepath = ScanProcessor.get_new_filepath(str(current_filepath) + '.hdf5')
+            current_uid = md['uid']
+            self.gen_parser.load(current_uid)
+        except:
+            print("md['name'] not set")
+            pass
+        
 
         print('on the way')
         if 'plan_name' in md:
