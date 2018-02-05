@@ -40,6 +40,27 @@ sender.connect("tcp://xf08id-srv2:5561")
 beamline_gpfs_path = '/GPFS/xf08id/'
 user_data_path = beamline_gpfs_path + 'User Data/'
 
+# Set up logging.
+import logging
+import logging.handlers
+logger = logging.getLogger('worker_srv')
+logger.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+# Write DEBUG and INFO messages to /var/log/data_processing_worker/debug.log.
+debug_file = logging.handlers.RotatingFileHandler(
+    '/var/log/data_processing_worker/debug.log',
+    maxBytes=10000000, backupCount=9)
+debug_file.setLevel(logging.DEBUG)
+debug_file.setFormatter(formatter)
+logger.addHandler(debug_file)
+# Write INFO messages to /var/log/data_processing_worker/info.log.
+info_file = logging.handlers.RotatingFileHandler(
+    '/var/log/data_processing_worker/info.log',
+    maxBytes=10000000, backupCount=9)
+info_file.setLevel(logging.INFO)
+info_file.setFormatter(formatter)
+logger.addHandler(info_file)
+
 
 class ScanProcessor():
     def __init__(self, gen_parser, xia_parser, db, beamline_gpfs_path, zmq_sender, username, *args, **kwargs):
@@ -116,6 +137,7 @@ class ScanProcessor():
                 pass
 
     def bin(self, md, requester, proc_info, filepath=''):
+        logger.info("Started binning %s", md['uid'])
         print('starting binning!', md['uid'])
         if filepath is not '':
             current_filepath = filepath
@@ -126,6 +148,7 @@ class ScanProcessor():
                                                  md['PROPOSAL'])
             current_filepath = str(Path(current_path) / Path(md['name'])) + '.txt'
         self.gen_parser.loadInterpFile(str(current_filepath))
+        logger.info("Filepath %s", current_filepath)
         e0 = proc_info['e0']
         edge_start = proc_info['edge_start']
         edge_end = proc_info['edge_end']
@@ -285,8 +308,10 @@ def create_ret(scan_type, uid, process_type, data, metadata, requester):
 
 
 if __name__ == "__main__":
+    logger.info("Starting ScanProcessor....")
     processor = ScanProcessor(gen_parser, xia_parser, db, beamline_gpfs_path, sender, 'xf08id')
     
+    logger.debug("Entering infinite loop...")
     while True:
         data = json.loads(receiver.recv().decode('utf-8'))
         md = db[data['uid']]['start']
