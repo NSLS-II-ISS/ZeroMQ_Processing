@@ -49,7 +49,7 @@ logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 # Write DEBUG and INFO messages to /var/log/data_processing_worker/debug.log.
 debug_file = logging.handlers.RotatingFileHandler(
-    '/nsls2/xf08id/log/{}_srv1_data_processing_debug.log'.format(machine_name),
+    '/nsls2/xf08id/log/{}_data_processing_debug.log'.format(machine_name),
     maxBytes=10000000, backupCount=9)
 debug_file.setLevel(logging.DEBUG)
 debug_file.setFormatter(formatter)
@@ -117,7 +117,7 @@ class ScanProcessor():
                 print('Done with the interpolation!')
 
                 e0 = int(md['e0'])
-                bin_df = self.gen_parser.bin(e0, e0 - 30, e0 + 50, 10, 0.2, 0.04)
+                bin_df = self.gen_parser.bin(e0, e0 - 30, e0 + 30, 4, 0.2, 0.04)
 
                 filename = self.gen_parser.data_manager.export_dat(current_filepath[:-5]+'.hdf5', e0)
                 print(f"current_filepath: {current_filepath[:-5] + '.hdf5'}")
