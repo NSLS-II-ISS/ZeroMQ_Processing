@@ -27,6 +27,7 @@ import grp
 # Set up zeromq sockets
 import zmq
 context = zmq.Context()
+machine_name = socket.gethostname()
 
 # Create PULLER to receive information from workstations
 receiver = context.socket(zmq.PULL)
@@ -37,7 +38,7 @@ sender = context.socket(zmq.PUSH)
 sender.connect("tcp://xf08id-srv2:5561")
 
 #Setup beamline specifics:
-beamline_gpfs_path = '/GPFS/xf08id/'
+beamline_gpfs_path = '/nsls2/xf08id/'
 user_data_path = beamline_gpfs_path + 'User Data/'
 
 # Set up logging.
@@ -48,14 +49,14 @@ logger.setLevel(logging.DEBUG)
 formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
 # Write DEBUG and INFO messages to /var/log/data_processing_worker/debug.log.
 debug_file = logging.handlers.RotatingFileHandler(
-    '/var/log/data_processing_worker/debug.log',
+    '/nsls2/xf08id/log/{}_srv1_data_processing_debug.log'.format(machine_name),
     maxBytes=10000000, backupCount=9)
 debug_file.setLevel(logging.DEBUG)
 debug_file.setFormatter(formatter)
 logger.addHandler(debug_file)
 # Write INFO messages to /var/log/data_processing_worker/info.log.
 info_file = logging.handlers.RotatingFileHandler(
-    '/var/log/data_processing_worker/info.log',
+    '/nsls2/xf08id/log/{}_data_processing_info.log'.format(machine_name),
     maxBytes=10000000, backupCount=9)
 info_file.setLevel(logging.INFO)
 info_file.setFormatter(formatter)
