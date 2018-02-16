@@ -77,7 +77,6 @@ class ScanProcessor():
         self.gid = grp.getgrnam(username).gr_gid
 
     def process(self, md, requester, interp_base='i0'):
-        print('starting processing!')
         current_path = self.create_user_dirs(self.user_data_path,
                                              md['year'],
                                              md['cycle'],
@@ -92,11 +91,12 @@ class ScanProcessor():
             pass
         
 
-        print('on the way')
+        
         if 'plan_name' in md:
             if md['plan_name'] == 'get_offsets':
                 pass
             elif md['plan_name'] == 'execute_trajectory' or md['plan_name'] == 'execute_xia_trajectory':
+                logger.info("Processing started for %s", md['uid'])
                 if md['plan_name'] == 'execute_trajectory':
                     self.process_tscan(interp_base)
                 elif md['plan_name'] == 'execute_xia_trajectory':
@@ -125,7 +125,7 @@ class ScanProcessor():
 
                 ret = create_ret('spectroscopy', current_uid, 'bin', bin_df, md, requester)
                 self.sender.send(ret)
-                print('Done with the binning!')
+                logger.info("Processing comlplete for %s", md['uid'])
 
                 
                 #store_results_databroker(md,
@@ -138,7 +138,7 @@ class ScanProcessor():
                 pass
 
     def bin(self, md, requester, proc_info, filepath=''):
-        logger.info("Started binning %s", md['uid'])
+        logger.info("Binning started for %s", md['uid'])
         print('starting binning!', md['uid'])
         if filepath is not '':
             current_filepath = filepath
@@ -162,6 +162,7 @@ class ScanProcessor():
         os.chown(filename, self.uid, self.gid)
         ret = create_ret('spectroscopy', md['uid'], 'bin', bin_df, md, requester)
         self.sender.send(ret)
+        logger.info("Binning complete for %s", md['uid'])
         print(os.getpid(), 'Done with the binning!') 
 
     def return_interp_data(self, md, requester, filepath=''):
@@ -352,3 +353,4 @@ if __name__ == "__main__":
 #            
 #                ret_msg = {'bin_eq_data': bin_eq_data, 'bin_data': bin_data}
 #                sender.send((data['requester'] + json.dumps(ret_msg)).encode())
+ 
