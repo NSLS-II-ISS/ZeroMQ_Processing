@@ -77,69 +77,52 @@ class ScanProcessor():
         self.gid = grp.getgrnam(username).gr_gid
 
     def process(self, md, requester, interp_base='i0'):
-        print('starting processing!')
-        current_path = self.create_user_dirs(self.user_data_path,
+        if md['plan_name'] == 'relative_scan' or md['plan_name'] == 'get_offsets':
+                logger.info("General scan - not processed")
+                pass
+        if md['plan_name'] == 'execute_trajectory' or md['plan_name'] == 'execute_xia_trajectory':
+            logger.info("Processing started for %s", md['name'])
+            current_path = self.create_user_dirs(self.user_data_path,
                                              md['year'],
                                              md['cycle'],
                                              md['PROPOSAL'])
-        try:
             current_filepath = Path(current_path) / Path(md['name'])
             current_filepath = ScanProcessor.get_new_filepath(str(current_filepath) + '.hdf5')
             current_uid = md['uid']
             self.gen_parser.load(current_uid)
-        except:
-            print("md['name'] not set")
-            pass
-        
+            if md['plan_name'] == 'execute_trajectory':
+                self.process_tscan(interp_base)
+            elif md['plan_name'] == 'execute_xia_trajectory':
+                self.process_tscanxia(md, current_filepath)
 
-        print('on the way')
-        if 'plan_name' in md:
-            if md['plan_name'] == 'get_offsets':
-                pass
-            elif md['plan_name'] == 'execute_trajectory' or md['plan_name'] == 'execute_xia_trajectory':
-                if md['plan_name'] == 'execute_trajectory':
-                    self.process_tscan(interp_base)
-                elif md['plan_name'] == 'execute_xia_trajectory':
-                    self.process_tscanxia(md, current_filepath)
+            division = self.gen_parser.interp_df['i0'].values / self.gen_parser.interp_df['it'].values
+            division[division < 0] = 1
 
-                division = self.gen_parser.interp_df['i0'].values / self.gen_parser.interp_df['it'].values
-                division[division < 0] = 1
+            filename = self.gen_parser.export_trace_hdf5(current_filepath[:-5], '')
+            os.chown(filename, self.uid, self.gid)
 
-                filename = self.gen_parser.export_trace_hdf5(current_filepath[:-5], '')
-                os.chown(filename, self.uid, self.gid)
+            filename = self.gen_parser.export_trace(current_filepath[:-5], '')
+            os.chown(filename, self.uid, self.gid)
 
-                filename = self.gen_parser.export_trace(current_filepath[:-5], '')
-                os.chown(filename, self.uid, self.gid)
-
-                ret = create_ret('spectroscopy', current_uid, 'interpolate', self.gen_parser.interp_df,
+            ret = create_ret('spectroscopy', current_uid, 'interpolate', self.gen_parser.interp_df,
                                  md, requester)
-                self.sender.send(ret)
-                print('Done with the interpolation!')
+            self.sender.send(ret)
+            logger.info("Interpolation complete for %s", md['name'])
 
-                e0 = int(md['e0'])
-                bin_df = self.gen_parser.bin(e0, e0 - 30, e0 + 30, 4, 0.2, 0.04)
+            e0 = int(md['e0'])
+            logger.info("Binning started for %s", md['name'])
+            bin_df = self.gen_parser.bin(e0, e0 - 30, e0 + 30, 4, 0.2, 0.04)
 
-                filename = self.gen_parser.data_manager.export_dat(current_filepath[:-5]+'.hdf5', e0)
-                print(f"current_filepath: {current_filepath[:-5] + '.hdf5'}")
-                os.chown(filename, self.uid, self.gid)
+            filename = self.gen_parser.data_manager.export_dat(current_filepath[:-5]+'.hdf5', e0)
+            print(f"current_filepath: {current_filepath[:-5] + '.hdf5'}")
+            os.chown(filename, self.uid, self.gid)
 
-                ret = create_ret('spectroscopy', current_uid, 'bin', bin_df, md, requester)
-                self.sender.send(ret)
-                print('Done with the binning!')
-
-                
-                #store_results_databroker(md,
-                #                         parent_uid,
-                #                         db_analysis,
-                #                         'interpolated',
-                #                         current_filepath[:-5] + '.hdf5',
-                #                         root='')
-            elif md['plan_name'] == 'relative_scan':
-                pass
+            ret = create_ret('spectroscopy', current_uid, 'bin', bin_df, md, requester)
+            self.sender.send(ret)
+            logger.info("Binning complete for %s", md['name'])
 
     def bin(self, md, requester, proc_info, filepath=''):
-        logger.info("Started binning %s", md['uid'])
-        print('starting binning!', md['uid'])
+        logger.info("Binning started for %s", md['name'])
         if filepath is not '':
             current_filepath = filepath
         else:
@@ -162,6 +145,7 @@ class ScanProcessor():
         os.chown(filename, self.uid, self.gid)
         ret = create_ret('spectroscopy', md['uid'], 'bin', bin_df, md, requester)
         self.sender.send(ret)
+        logger.info("Binning complete for %s", md['name'])
         print(os.getpid(), 'Done with the binning!') 
 
     def return_interp_data(self, md, requester, filepath=''):
@@ -330,25 +314,3 @@ if __name__ == "__main__":
             elif process_type == 'request_interpolated_data':
                 processor.return_interp_data(start_doc, requester=data['requester'], filepath=data['processing_info']['filepath'])
 
-#                interpolated_fn = '{}{}.{}.{}/{}.txt'.format(user_data_path,
-#                                                        md['year'],
-#                                                        md['cycle'],
-#                                                        md['PROPOSAL'],
-#                                                        md['name'])
-#            
-#                gen_parser.loadInterpFile(interpolated_fn)
-#                bin_eq_data = pd.DataFrame(gen_parser.bin_equal(en_spacing=0.5)).to_json()
-#            
-#                process_info = data['processing_info']
-#                bin_data = []
-#                for info in process_info:
-#                    bin_data.append(pd.DataFrame(gen_parser.bin(info['e0'],
-#                                                   info['e0'] + info['edge_start'],
-#                                                   info['e0'] + info['edge_end'],
-#                                                   info['pre-edge'],
-#                                                   info['xanes'],
-#                                                   info['exafs'])).to_json())
-#                print('Done: {}'.format(data['uid']))
-#            
-#                ret_msg = {'bin_eq_data': bin_eq_data, 'bin_data': bin_data}
-#                sender.send((data['requester'] + json.dumps(ret_msg)).encode())
