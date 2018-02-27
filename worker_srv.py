@@ -111,6 +111,8 @@ class ScanProcessor():
                 filename = self.gen_parser.export_trace(current_filepath[:-5], '')
                 os.chown(filename, self.uid, self.gid)
 
+                logger.info('File %s stored', filename'])
+
                 ret = create_ret('spectroscopy', current_uid, 'interpolate', self.gen_parser.interp_df,
                                  md, requester)
                 self.sender.send(ret)
@@ -293,7 +295,8 @@ class ScanProcessor():
         if not op.exists(path):
             os.makedirs(path)
             call(['setfacl', '-m', 'g:iss-staff:rwx', path])
-            call(['chmod', '770', path])
+            call(['chown', '-R', 'xf08id:xf08id', path ])
+            logger.info("Directory %s created succesfully", md['uid'])
 
 
 def create_ret(scan_type, uid, process_type, data, metadata, requester):
