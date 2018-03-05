@@ -91,17 +91,18 @@ class ScanProcessor():
             pass
         
 
-        
+        logger.info("Processing started for %s", md['uid'])
         if 'plan_name' in md:
             if md['plan_name'] == 'get_offsets':
                 pass
             elif md['plan_name'] == 'execute_trajectory' or md['plan_name'] == 'execute_xia_trajectory':
-                logger.info("Processing started for %s", md['uid'])
+                logger.info("Interpolation started for %s", md['uid'])
+                
                 if md['plan_name'] == 'execute_trajectory':
                     self.process_tscan(interp_base)
                 elif md['plan_name'] == 'execute_xia_trajectory':
                     self.process_tscanxia(md, current_filepath)
-
+                
                 division = self.gen_parser.interp_df['i0'].values / self.gen_parser.interp_df['it'].values
                 division[division < 0] = 1
 
@@ -111,20 +112,22 @@ class ScanProcessor():
                 filename = self.gen_parser.export_trace(current_filepath[:-5], '')
                 os.chown(filename, self.uid, self.gid)
 
-                logger.info('File %s stored', filename)
+                logger.info('Interpolated file %s stored to ', filename)
 
                 ret = create_ret('spectroscopy', current_uid, 'interpolate', self.gen_parser.interp_df,
                                  md, requester)
                 self.sender.send(ret)
-                print('Done with the interpolation!')
-
+                logger.info('Interpolation of %s complete', filename)
+                logger.info('Binning of %s started', filename)
                 e0 = int(md['e0'])
                 bin_df = self.gen_parser.bin(e0, e0 - 30, e0 + 30, 4, 0.2, 0.04)
 
                 filename = self.gen_parser.data_manager.export_dat(current_filepath[:-5]+'.hdf5', e0)
                 print(f"current_filepath: {current_filepath[:-5] + '.hdf5'}")
                 os.chown(filename, self.uid, self.gid)
-
+                logger.info('Binning of %s complete', filename)
+                
+                
                 ret = create_ret('spectroscopy', current_uid, 'bin', bin_df, md, requester)
                 self.sender.send(ret)
                 logger.info("Processing comlplete for %s", md['uid'])
