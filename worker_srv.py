@@ -101,7 +101,9 @@ class ScanProcessor():
                 if md['plan_name'] == 'execute_trajectory':
                     self.process_tscan(interp_base)
                 elif md['plan_name'] == 'execute_xia_trajectory':
+                    print(current_filepath)
                     self.process_tscanxia(md, current_filepath)
+                    
                 
                 division = self.gen_parser.interp_df['i0'].values / self.gen_parser.interp_df['it'].values
                 division[division < 0] = 1
